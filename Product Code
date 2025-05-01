@@ -1,0 +1,96 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+#define MIC_PIN 2
+#define RELAY_PIN 7
+#define BUZZER_PIN 8
+#define FIX_BTN 3   // Changed from SET to FIX
+#define RESET_BTN 4
+#define PLUS_BTN 5
+#define MINUS_BTN 6
+
+LiquidCrystal_I2C lcd(0x27, 16, 2); // Set LCD address
+
+int whistleCount = 0;
+int maxWhistles = 3;
+unsigned long lastWhistleTime = 0;
+bool isFixed = false;  // Track if maxWhistles is locked
+
+void setup() {
+  pinMode(MIC_PIN, INPUT);
+  pinMode(RELAY_PIN, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
+  pinMode(FIX_BTN, INPUT_PULLUP);
+  pinMode(RESET_BTN, INPUT_PULLUP);
+  pinMode(PLUS_BTN, INPUT_PULLUP);
+  pinMode(MINUS_BTN, INPUT_PULLUP);
+
+  digitalWrite(RELAY_PIN, HIGH);  // Relay ON initially
+  digitalWrite(BUZZER_PIN, LOW);  // Buzzer OFF
+
+  lcd.init();
+  lcd.backlight();
+  updateLCD();
+}
+
+void loop() {
+  if (digitalRead(MIC_PIN) == HIGH && millis() - lastWhistleTime > 1000) {  
+    whistleCount++;  
+    lastWhistleTime = millis();  // Store the last whistle time
+    updateLCD();
+  }
+
+  if (digitalRead(FIX_BTN) == LOW) {  
+    isFixed = true;  // Lock maxWhistles value
+    updateLCD();
+    delay(500);
+  }
+
+  if (digitalRead(RESET_BTN) == LOW) {  
+    whistleCount = 0;  
+    maxWhistles = 3;
+    isFixed = false;  // Unlock maxWhistles
+    digitalWrite(RELAY_PIN, HIGH);
+    digitalWrite(BUZZER_PIN, LOW);
+    updateLCD();
+    delay(500);
+  }
+
+  if (!isFixed) {  // Only allow changes if FIX button is not pressed
+    if (digitalRead(PLUS_BTN) == LOW) {  
+      maxWhistles++;
+      updateLCD();
+      delay(500);
+    }
+
+    if (digitalRead(MINUS_BTN) == LOW && maxWhistles > 1) {  
+      maxWhistles--;
+      updateLCD();
+      delay(500);
+    }
+  }
+
+  if (whistleCount >= maxWhistles) {  
+    digitalWrite(RELAY_PIN, LOW);  // Keep relay logic same
+    digitalWrite(BUZZER_PIN, HIGH); // Buzzer ON
+    lcd.setCursor(0, 1);
+    lcd.print("Whistles Done!  ");
+  }
+}
+
+void updateLCD() {
+  lcd.clear();  // Clear screen to remove previous text
+
+  lcd.setCursor(0, 0);
+  lcd.print("Whistles: ");
+  lcd.print(whistleCount);
+
+  lcd.setCursor(0, 1);
+  if (whistleCount < maxWhistles) {
+    lcd.print("Max: ");
+    lcd.print(maxWhistles);
+    if (isFixed) {
+      lcd.print(" (Locked)");
+    }
+  } 
+}
